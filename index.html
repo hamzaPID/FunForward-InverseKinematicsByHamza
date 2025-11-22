@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>FunKinematicsByHamza – FK & IK Visualizer</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f5f5;
+    }
+    #container {
+      display: flex;
+      height: 100vh;
+    }
+    #left {
+      width: 330px;
+      background: #ffffff;
+      border-right: 1px solid #ddd;
+      padding: 14px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+    }
+    #left h1 {
+      font-size: 18px;
+      margin: 0 0 4px;
+    }
+    #left h2 {
+      font-size: 14px;
+      margin: 0 0 10px;
+      color: #666;
+    }
+    #tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid #888;
+      background: #fafafa;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .tab-btn.active {
+      background: #2a7ae2;
+      color: #fff;
+      border-color: #2a7ae2;
+    }
+    .tab-content {
+      display: none;
+      flex: 1;
+      overflow: auto;
+      font-size: 13px;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .field-group {
+      margin-bottom: 8px;
+    }
+    .field-group label {
+      display: block;
+      margin-bottom: 2px;
+    }
+    .field-group input[type="number"],
+    .field-group input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 4px;
+      font-size: 13px;
+    }
+    .field-group input[type="range"] {
+      width: 100%;
+    }
+    table.dh-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px;
+      font-size: 12px;
+    }
+    table.dh-table th,
+    table.dh-table td {
+      border: 1px solid #ccc;
+      padding: 3px 4px;
+      text-align: center;
+    }
+    #fkInfo, #ikInfo {
+      font-size: 12px;
+      margin-top: 6px;
+      padding: 4px 6px;
+      background: #f0f4ff;
+      border-radius: 6px;
+      min-height: 40px;
+    }
+    #right {
+      flex: 1;
+      padding: 12px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #canvasWrapper {
+      flex: 1;
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+    #armCanvas {
+      width: 100%;
+      height: 100%;
+    }
+    #eeCoords {
+      font-size: 13px;
+      padding: 6px 8px;
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+    pre {
+      font-family: "Fira Code", monospace;
+      font-size: 11px;
+      white-space: pre;
+      background: #0d1117;
+      color: #c9d1d9;
+      padding: 6px;
+      border-radius: 6px;
+      overflow: auto;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <div id="left">
+      <h1>FunKinematicsByHamza</h1>
+      <h2>2-Link Planar Arm – DH, FK &amp; IK</h2>
+
+      <!-- Tabs -->
+      <div id="tabs">
+        <button id="tabDH"  class="tab-btn active">DH Parameters</button>
+        <button id="tabFK"  class="tab-btn">Forward Kinematics</button>
+        <button id="tabIK"  class="tab-btn">Inverse Kinematics</button>
+      </div>
+
+      <!-- Tab: DH Parameters -->
+      <div id="contentDH" class="tab-content active">
+        <p>
+          2-link planar robot (R-R) in XY plane. Standard DH with
+          <code>α₁ = α₂ = 0</code>, <code>d₁ = d₂ = 0</code>.
+        </p>
+        <div class="field-group">
+          <label>Link 1 length a₁ [m]:</label>
+          <input type="number" id="a1Input" min="0.1" max="2" step="0.1" value="1.0">
+        </div>
+        <div class="field-group">
+          <label>Link 2 length a₂ [m]:</label>
+          <input type="number" id="a2Input" min="0.1" max="2" step="0.1" value="0.7">
+        </div>
+        <p>Current joint angles (shared with FK/IK tabs):</p>
+        <div class="field-group">
+          <label>θ₁ [deg]:</label>
+          <input type="number" id="theta1Shared" min="-180" max="180" step="1" value="30">
+        </div>
+        <div class="field-group">
+          <label>θ₂ [deg]:</label>
+          <input type="number" id="theta2Shared" min="-180" max="180" step="1" value="30">
+        </div>
+        <p>Denavit–Hartenberg table (standard DH):</p>
+        <table class="dh-table">
+          <thead>
+            <tr>
+              <th>Link i</th>
+              <th>aᵢ [m]</th>
+              <th>αᵢ [rad]</th>
+              <th>dᵢ [m]</th>
+              <th>θᵢ [deg]</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td id="dh_a1">1.0</td>
+              <td>0</td>
+              <td>0</td>
+              <td id="dh_th1">30</td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td id="dh_a2">0.7</td>
+              <td>0</td>
+              <td>0</td>
+              <td id="dh_th2">30</td>
+            </tr>
+          </tbody>
+        </table>
+        <p style="margin-top:6px;font-size:12px;">
+          This DH table feeds into the FK tab, which computes the end-effector
+          pose using these parameters.
+        </p>
+      </div>
+
+      <!-- Tab: Forward Kinematics -->
+      <div id="contentFK" class="tab-content">
+        <p>Use sliders to choose joint angles θ₁ and θ₂. The arm and end-effector pose update immediately.</p>
+        <div class="field-group">
+          <label>θ₁ [deg]: <span id="theta1Label">30</span></label>
+          <input type="range" id="theta1Slider" min="-180" max="180" step="1" value="30">
+        </div>
+        <div class="field-group">
+          <label>θ₂ [deg]: <span id="theta2Label">30</span></label>
+          <input type="range" id="theta2Slider" min="-180" max="180" step="1" value="30">
+        </div>
+        <div id="fkInfo"></div>
+        <p style="margin-top:6px;">End-effector homogeneous transform T₀₂:</p>
+        <pre id="T02Display"></pre>
+      </div>
+
+      <!-- Tab: Inverse Kinematics -->
+      <div id="contentIK" class="tab-content">
+        <p>
+          Choose a target point (x, y) in the plane. The solver computes θ₁, θ₂ (elbow-up / elbow-down),
+          if the point lies inside the reachable workspace.
+        </p>
+        <div class="field-group">
+          <label>x target [m]:</label>
+          <input type="number" id="xTargetInput" step="0.05" value="1.0">
+        </div>
+        <div class="field-group">
+          <label>y target [m]:</label>
+          <input type="number" id="yTargetInput" step="0.05" value="0.5">
+        </div>
+        <div class="field-group">
+          <label>Solution branch:</label>
+          <label><input type="radio" name="ikBranch" value="elbowDown" checked> Elbow-down</label><br>
+          <label><input type="radio" name="ikBranch" value="elbowUp"> Elbow-up</label>
+        </div>
+        <button id="ikSolveBtn">Solve IK</button>
+        <div id="ikInfo"></div>
+      </div>
+    </div>
+
+    <!-- Right side: visual + coordinates -->
+    <div id="right">
+      <div id="canvasWrapper">
+        <canvas id="armCanvas"></canvas>
+      </div>
+      <div id="eeCoords">
+        <b>End-effector (from FK):</b>
+        <span id="eeText">(x, y) = (?, ?)</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===== Helpers =====
+    function deg2rad(d) { return d * Math.PI / 180; }
+    function rad2deg(r) { return r * 180 / Math.PI; }
+
+    // Global arm parameters (2-link planar)
+    let a1 = 1.0;
+    let a2 = 0.7;
+    let theta1Deg = 30;
+    let theta2Deg = 30;
+    let targetX = 1.0;
+    let targetY = 0.5;
+
+    // Canvas setup
+    const armCanvas = document.getElementById("armCanvas");
+    const armCtx = armCanvas.getContext("2d");
+
+    function resizeCanvas() {
+      const wrapper = document.getElementById("canvasWrapper");
+      armCanvas.width = wrapper.clientWidth;
+      armCanvas.height = wrapper.clientHeight;
+      drawArm();
+    }
+    window.addEventListener("resize", resizeCanvas);
+    setTimeout(resizeCanvas, 50);
+
+    // ===== Tabs =====
+    const tabDH  = document.getElementById("tabDH");
+    const tabFK  = document.getElementById("tabFK");
+    const tabIK  = document.getElementById("tabIK");
+    const contentDH = document.getElementById("contentDH");
+    const contentFK = document.getElementById("contentFK");
+    const contentIK = document.getElementById("contentIK");
+
+    function setActiveTab(tabName) {
+      // Buttons
+      tabDH.classList.toggle("active", tabName === "DH");
+      tabFK.classList.toggle("active", tabName === "FK");
+      tabIK.classList.toggle("active", tabName === "IK");
+      // Contents
+      contentDH.classList.toggle("active", tabName === "DH");
+      contentFK.classList.toggle("active", tabName === "FK");
+      contentIK.classList.toggle("active", tabName === "IK");
+    }
+
+    tabDH.addEventListener("click", () => setActiveTab("DH"));
+    tabFK.addEventListener("click", () => setActiveTab("FK"));
+    tabIK.addEventListener("click", () => setActiveTab("IK"));
+
+    // ===== DOM elements =====
+    const a1Input = document.getElementById("a1Input");
+    const a2Input = document.getElementById("a2Input");
+    const th1Shared = document.getElementById("theta1Shared");
+    const th2Shared = document.getElementById("theta2Shared");
+    const dh_a1 = document.getElementById("dh_a1");
+    const dh_a2 = document.getElementById("dh_a2");
+    const dh_th1 = document.getElementById("dh_th1");
+    const dh_th2 = document.getElementById("dh_th2");
+
+    const theta1Slider = document.getElementById("theta1Slider");
+    const theta2Slider = document.getElementById("theta2Slider");
+    const theta1Label  = document.getElementById("theta1Label");
+    const theta2Label  = document.getElementById("theta2Label");
+    const fkInfo       = document.getElementById("fkInfo");
+    const T02Display   = document.getElementById("T02Display");
+
+    const xTargetInput = document.getElementById("xTargetInput");
+    const yTargetInput = document.getElementById("yTargetInput");
+    const ikSolveBtn   = document.getElementById("ikSolveBtn");
+    const ikInfo       = document.getElementById("ikInfo");
+
+    const eeText = document.getElementById("eeText");
+
+    // ===== FK computation =====
+    function computeFK(a1, a2, th1Deg, th2Deg) {
+      const t1 = deg2rad(th1Deg);
+      const t2 = deg2rad(th2Deg);
+      const x = a1 * Math.cos(t1) + a2 * Math.cos(t1 + t2);
+      const y = a1 * Math.sin(t1) + a2 * Math.sin(t1 + t2);
+      const th = t1 + t2; // end eff orientation
+      return {x, y, th};
+    }
+
+    // T02 for planar 2R with alpha=0,d=0
+    function computeT02(a1, a2, th1Deg, th2Deg) {
+      const fk = computeFK(a1, a2, th1Deg, th2Deg);
+      const c = Math.cos(fk.th);
+      const s = Math.sin(fk.th);
+      const T = [
+        [ c, -s, 0, fk.x ],
+        [ s,  c, 0, fk.y ],
+        [ 0,  0, 1, 0    ],
+        [ 0,  0, 0, 1    ]
+      ];
+      return T;
+    }
+
+    function formatMatrix(T) {
+      return T.map(row =>
+        row.map(v => v.toFixed(3).padStart(8, " ")).join(" ")
+      ).join("\n");
+    }
+
+    // ===== IK computation (2-link planar) =====
+    function solveIK(a1, a2, x, y, elbowUp) {
+      const r2 = x*x + y*y;
+      const num = r2 - a1*a1 - a2*a2;
+      const den = 2*a1*a2;
+      const c2 = num / den;
+
+      if (c2 < -1 || c2 > 1) {
+        return null; // unreachable
+      }
+
+      const s2_base = Math.sqrt(Math.max(0, 1 - c2*c2));
+      const s2 = elbowUp ? -s2_base : s2_base;
+      const th2 = Math.atan2(s2, c2);
+
+      const k1 = a1 + a2 * c2;
+      const k2 = a2 * s2;
+
+      const th1 = Math.atan2(y, x) - Math.atan2(k2, k1);
+
+      return {
+        theta1Deg: rad2deg(th1),
+        theta2Deg: rad2deg(th2)
+      };
+    }
+
+    // ===== Drawing =====
+    function drawArm(showTarget=true) {
+      const W = armCanvas.width;
+      const H = armCanvas.height;
+      armCtx.clearRect(0, 0, W, H);
+      if (W === 0 || H === 0) return;
+
+      const fk = computeFK(a1, a2, theta1Deg, theta2Deg);
+
+      // coordinate mapping
+      const reach = a1 + a2;
+      const margin = 0.2 * reach;
+      const scale = 0.8 * Math.min(W, H) / (2 * (reach + margin));
+
+      const originX = W / 2;
+      const originY = H * 0.7;
+
+      function worldToScreenX(x) { return originX + x * scale; }
+      function worldToScreenY(y) { return originY - y * scale; }
+
+      // workspace circle (max reach)
+      armCtx.strokeStyle = "#dddddd";
+      armCtx.lineWidth = 1.5;
+      armCtx.beginPath();
+      armCtx.arc(originX, originY, reach * scale, 0, 2*Math.PI);
+      armCtx.stroke();
+
+      // base
+      armCtx.fillStyle = "#555";
+      armCtx.beginPath();
+      armCtx.arc(originX, originY, 6, 0, 2*Math.PI);
+      armCtx.fill();
+
+      // joint positions
+      const t1 = deg2rad(theta1Deg);
+      const t2 = deg2rad(theta2Deg);
+      const x1 = a1 * Math.cos(t1);
+      const y1 = a1 * Math.sin(t1);
+      const x2 = fk.x;
+      const y2 = fk.y;
+
+      const sx0 = worldToScreenX(0);
+      const sy0 = worldToScreenY(0);
+      const sx1 = worldToScreenX(x1);
+      const sy1 = worldToScreenY(y1);
+      const sx2 = worldToScreenX(x2);
+      const sy2 = worldToScreenY(y2);
+
+      // link 1
+      armCtx.strokeStyle = "#4da6ff";
+      armCtx.lineWidth = 6;
+      armCtx.beginPath();
+      armCtx.moveTo(sx0, sy0);
+      armCtx.lineTo(sx1, sy1);
+      armCtx.stroke();
+
+      // link 2
+      armCtx.strokeStyle = "#2e7d32";
+      armCtx.lineWidth = 6;
+      armCtx.beginPath();
+      armCtx.moveTo(sx1, sy1);
+      armCtx.lineTo(sx2, sy2);
+      armCtx.stroke();
+
+      // joints
+      armCtx.fillStyle = "#000";
+      armCtx.beginPath();
+      armCtx.arc(sx1, sy1, 5, 0, 2*Math.PI);
+      armCtx.fill();
+      armCtx.beginPath();
+      armCtx.arc(sx2, sy2, 5, 0, 2*Math.PI);
+      armCtx.fill();
+
+      // Target point (for IK)
+      if (showTarget) {
+        const sxT = worldToScreenX(targetX);
+        const syT = worldToScreenY(targetY);
+        armCtx.fillStyle = "#d32f2f";
+        armCtx.beginPath();
+        armCtx.arc(sxT, syT, 4, 0, 2*Math.PI);
+        armCtx.fill();
+        armCtx.font = "11px sans-serif";
+        armCtx.fillText("Target", sxT + 6, syT - 6);
+      }
+    }
+
+    // ===== Sync functions =====
+    function updateDHTable() {
+      dh_a1.textContent = a1.toFixed(2);
+      dh_a2.textContent = a2.toFixed(2);
+      dh_th1.textContent = theta1Deg.toFixed(1);
+      dh_th2.textContent = theta2Deg.toFixed(1);
+    }
+
+    function updateFKOutputs() {
+      const fk = computeFK(a1, a2, theta1Deg, theta2Deg);
+      eeText.textContent =
+        `(x, y) = (${fk.x.toFixed(3)} , ${fk.y.toFixed(3)}) m`;
+
+      fkInfo.innerHTML =
+        `<b>Forward Kinematics:</b> x = a₁cosθ₁ + a₂cos(θ₁+θ₂), ` +
+        `y = a₁sinθ₁ + a₂sin(θ₁+θ₂)<br>` +
+        `For a₁ = ${a1.toFixed(2)} m, a₂ = ${a2.toFixed(2)} m, ` +
+        `θ₁ = ${theta1Deg.toFixed(1)}°, θ₂ = ${theta2Deg.toFixed(1)}°`;
+
+      const T02 = computeT02(a1, a2, theta1Deg, theta2Deg);
+      T02Display.textContent = formatMatrix(T02);
+    }
+
+    function syncFromSharedAngles() {
+      theta1Deg = parseFloat(th1Shared.value);
+      theta2Deg = parseFloat(th2Shared.value);
+      theta1Slider.value = theta1Deg;
+      theta2Slider.value = theta2Deg;
+      theta1Label.textContent = theta1Deg.toFixed(0);
+      theta2Label.textContent = theta2Deg.toFixed(0);
+      updateDHTable();
+      updateFKOutputs();
+      drawArm();
+    }
+
+    // ===== Event handlers =====
+
+    // DH tab: link lengths + shared angles
+    a1Input.addEventListener("input", () => {
+      const v = parseFloat(a1Input.value);
+      if (!isNaN(v) && v > 0) {
+        a1 = v;
+        updateDHTable();
+        updateFKOutputs();
+        drawArm();
+      }
+    });
+
+    a2Input.addEventListener("input", () => {
+      const v = parseFloat(a2Input.value);
+      if (!isNaN(v) && v > 0) {
+        a2 = v;
+        updateDHTable();
+        updateFKOutputs();
+        drawArm();
+      }
+    });
+
+    th1Shared.addEventListener("input", syncFromSharedAngles);
+    th2Shared.addEventListener("input", syncFromSharedAngles);
+
+    // FK tab sliders
+    theta1Slider.addEventListener("input", () => {
+      theta1Deg = parseFloat(theta1Slider.value);
+      theta1Label.textContent = theta1Deg.toFixed(0);
+      th1Shared.value = theta1Deg.toFixed(0);
+      updateDHTable();
+      updateFKOutputs();
+      drawArm();
+    });
+
+    theta2Slider.addEventListener("input", () => {
+      theta2Deg = parseFloat(theta2Slider.value);
+      theta2Label.textContent = theta2Deg.toFixed(0);
+      th2Shared.value = theta2Deg.toFixed(0);
+      updateDHTable();
+      updateFKOutputs();
+      drawArm();
+    });
+
+    // IK tab
+    xTargetInput.addEventListener("input", () => {
+      const v = parseFloat(xTargetInput.value);
+      if (!isNaN(v)) {
+        targetX = v;
+        drawArm();
+      }
+    });
+
+    yTargetInput.addEventListener("input", () => {
+      const v = parseFloat(yTargetInput.value);
+      if (!isNaN(v)) {
+        targetY = v;
+        drawArm();
+      }
+    });
+
+    ikSolveBtn.addEventListener("click", () => {
+      const x = parseFloat(xTargetInput.value);
+      const y = parseFloat(yTargetInput.value);
+      targetX = x;
+      targetY = y;
+
+      // workspace check
+      const r = Math.sqrt(x*x + y*y);
+      const rMin = Math.abs(a1 - a2);
+      const rMax = a1 + a2;
+
+      if (r < rMin - 1e-6 || r > rMax + 1e-6) {
+        ikInfo.innerHTML =
+          `<b>Unreachable:</b> distance r = ${r.toFixed(3)} m ` +
+          `is outside the annulus [${rMin.toFixed(3)}, ${rMax.toFixed(3)}].`;
+        drawArm();
+        return;
+      }
+
+      const branch = document.querySelector('input[name="ikBranch"]:checked').value;
+      const elbowUp = (branch === "elbowUp");
+      const sol = solveIK(a1, a2, x, y, elbowUp);
+
+      if (!sol) {
+        ikInfo.innerHTML =
+          "<b>IK failed:</b> numerical error or unreachable point.";
+        drawArm();
+        return;
+      }
+
+      theta1Deg = sol.theta1Deg;
+      theta2Deg = sol.theta2Deg;
+
+      // normalize to [-180, 180]
+      theta1Deg = ((theta1Deg + 180) % 360) - 180;
+      theta2Deg = ((theta2Deg + 180) % 360) - 180;
+
+      // Update all controls
+      th1Shared.value = theta1Deg.toFixed(1);
+      th2Shared.value = theta2Deg.toFixed(1);
+      theta1Slider.value = theta1Deg;
+      theta2Slider.value = theta2Deg;
+      theta1Label.textContent = theta1Deg.toFixed(1);
+      theta2Label.textContent = theta2Deg.toFixed(1);
+
+      updateDHTable();
+      updateFKOutputs();
+      drawArm();
+
+      ikInfo.innerHTML =
+        `<b>IK solution (${branch}):</b><br>` +
+        `θ₁ ≈ ${theta1Deg.toFixed(2)}°, ` +
+        `θ₂ ≈ ${theta2Deg.toFixed(2)}°<br>` +
+        `Target (x, y) = (${x.toFixed(3)} , ${y.toFixed(3)}) m`;
+    });
+
+    // ===== Initial sync =====
+    function initAll() {
+      a1 = parseFloat(a1Input.value);
+      a2 = parseFloat(a2Input.value);
+      theta1Deg = parseFloat(th1Shared.value);
+      theta2Deg = parseFloat(th2Shared.value);
+      targetX = parseFloat(xTargetInput.value);
+      targetY = parseFloat(yTargetInput.value);
+
+      theta1Slider.value = theta1Deg;
+      theta2Slider.value = theta2Deg;
+      theta1Label.textContent = theta1Deg.toFixed(0);
+      theta2Label.textContent = theta2Deg.toFixed(0);
+
+      updateDHTable();
+      updateFKOutputs();
+      drawArm();
+    }
+
+    initAll();
+  </script>
+</body>
+</html>
